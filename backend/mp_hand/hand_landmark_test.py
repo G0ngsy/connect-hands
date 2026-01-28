@@ -1,60 +1,47 @@
-import sys
-import cv2
+import cv2, mediapipe as mp, numpy as np, os, json
 
-print("1. OpenCV 로딩 중...")
-import mediapipe as mp
-print("2. MediaPipe 로딩 완료")
+base_dir = r"C:\Users\akfnx\Desktop\suhwa" 
+output_dir = r"C:\Users\akfnx\Desktop\suhwa\results"
+os.makedirs(output_dir, exist_ok=True)
 
 mp_hands = mp.solutions.hands
-mp_draw = mp.solutions.drawing_utils
+hands = mp_hands.Hands(max_num_hands=2, min_detection_confidence=0.5)
 
-print("3. 카메라 초기화 중...")
-cap = cv2.VideoCapture(0)
+print("🚀 [1단계] 양손 상대 좌표 데이터 추출 시작...")
 
-if not cap.isOpened():
-    print("에러: 카메라를 열 수 없습니다.")
-    sys.exit()
+for root, dirs, files in os.walk(base_dir):
+    for filename in files:
+        if filename.endswith("_morpheme.json") and "WORD15" in filename:
+            video_path = os.path.join(root, filename.replace("_morpheme.json", ".mp4"))
+            if not os.path.exists(video_path): continue
 
-# MediaPipe Hands 설정
-hands = mp_hands.Hands(
-    static_image_mode=False,
-    max_num_hands=1,
-    min_detection_confidence=0.7,
-    min_tracking_confidence=0.7
-)
+            with open(os.path.join(root, filename), 'r', encoding='utf-8') as f:
+                content = json.load(f)
+                start_t, end_t = content['data'][0]['start'], content['data'][0]['end']
 
-print("4. 준비 완료! ESC 누르면 종료됩니다.")
-
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        break
-
-    frame = cv2.flip(frame, 1)
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-    results = hands.process(rgb)
-
-    if results.multi_hand_landmarks:
-        for hand_landmarks in results.multi_hand_landmarks:
-
-            # 🔥 Day 2 핵심: 손 랜드마크 좌표 출력
-            for idx, lm in enumerate(hand_landmarks.landmark):
-                print(f"{idx}: x={lm.x:.3f}, y={lm.y:.3f}, z={lm.z:.3f}")
-
-            print("-------- 프레임 --------")
-            break  # 손 하나만 확인
-
-            mp_draw.draw_landmarks(
-                frame,
-                hand_landmarks,
-                mp_hands.HAND_CONNECTIONS
-            )
-
-    cv2.imshow("Hand Landmark Test", frame)
-
-    if cv2.waitKey(1) & 0xFF == 27:  # ESC
-        break
-
-cap.release()
-cv2.destroyAllWindows()
+            cap = cv2.VideoCapture(video_path)
+            video_landmarks = []
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret: break
+                curr_sec = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+                if start_t <= curr_sec <= end_t:
+                    res = hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                    
+                    row = []
+                    # 💡 양손(최대 2개) 처리 로직
+                    for i in range(2):
+                        if res.multi_hand_landmarks and i < len(res.multi_hand_landmarks):
+                            h = res.multi_hand_landmarks[i]
+                            base_x, base_y, base_z = h.landmark[0].x, h.landmark[0].y, h.landmark[0].z
+                            for lm in h.landmark:
+                                row.extend([lm.x - base_x, lm.y - base_y, lm.z - base_z])
+                        else:
+                            row.extend([0.0] * 63) # 손이 없으면 0으로 채움
+                    
+                    if any(v != 0.0 for v in row): # 최소 한 손이라도 감지된 경우만 저장
+                        video_landmarks.append(row)
+            cap.release()
+            if video_landmarks:
+                np.save(os.path.join(output_dir, f"{filename.replace('.json', '')}.npy"), np.array(video_landmarks))
+                print(f"✅ 양손 저장 완료: {filename}")
