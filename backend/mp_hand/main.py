@@ -21,6 +21,7 @@ if not cap.isOpened():
     print("에러: 카메라를 열 수 없습니다.")
     sys.exit()
 
+
 # 모델 설정
 hands = mp_hands.Hands(
     static_image_mode=False,
