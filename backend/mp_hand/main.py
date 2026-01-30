@@ -22,7 +22,8 @@ app.add_middleware(
 model = None
 actions = ['WORD1501', 'WORD1502', 'WORD1503', 'WORD1504', 'WORD1505', 
            'WORD1506', 'WORD1507', 'WORD1508', 'WORD1509', 'WORD1510', 
-           'WORD1511', 'WORD1512', 'WORD1513', 'WORD1514', 'WORD1520']
+           'WORD1511', 'WORD1512', 'WORD1513', 'WORD1514', 'WORD1518', 
+           'WORD1519', 'WORD1520','LOVE','GLAD','HELLO', 'THANKS']
 
 @app.on_event("startup")
 def load_resources():
