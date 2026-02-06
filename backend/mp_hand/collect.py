@@ -9,7 +9,7 @@ output_dir = r"C:\Users\akfnx\Desktop\suhwa\results"
 os.makedirs(output_dir, exist_ok=True)
 
 # 💡 테스트하고 싶은 단어 설정
-action_name = "반갑다"  
+action_name = "IDLE"  
 max_len = 62          # 모델 규격 프레임 수 (데이터 일관성을 위해 고정)
 
 # --- 한글 출력을 위한 함수 정의 ---
