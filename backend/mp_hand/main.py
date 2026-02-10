@@ -12,6 +12,7 @@ import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from tensorflow.keras.models import load_model
+from dotenv import load_dotenv
 
 # Gemini 라이브러리 로드 시 에러 방지
 try:
@@ -32,7 +33,10 @@ app.add_middleware(
 
 # [3] 설정 및 모델 로드
 actions = ['안녕하세요', 'ILOVEU', '반갑다', 'HELLO', '감사합니다', '좋다', 'BAD', '만나다', 'IDLE']
-GOOGLE_API_KEY = "AIzaSyCFXD1osl8u8uitJI1pSI7YscG9JXgi1zE"
+#.env 파일의 내용을 환경 변수로 로드
+load_dotenv()
+#os.getenv를 통해 키를 안전하게 가져옴
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 model = None
 gemini_model = None
 
@@ -48,7 +52,7 @@ async def load_resources():
             print("✅ 1단계: 수어 단어 인식 모델 로드 완료")
         
         # Gemini AI 설정
-        if GOOGLE_API_KEY != "AIzaSyCFXD1osl8u8uitJI1pSI7YscG9JXgi1zE":
+        if GOOGLE_API_KEY:
             genai.configure(api_key=GOOGLE_API_KEY)
             gemini_model = genai.GenerativeModel('gemini-1.5-flash')
             print("✅ 2단계: 문장 변환용 Gemini AI 연결 완료")

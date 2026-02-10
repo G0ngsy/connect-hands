@@ -31,18 +31,26 @@ function App() {
         const data: SignResult = JSON.parse(event.data);
         setCurrentResult(data);
 
-        // 90% 이상 일치할 때만 기록에 저장
-        if (data.confidence > 0.90) {
-          setLogs((prev) => {
-            if (prev.length > 0 && prev[0].word === data.word) return prev;
-            const newEntry = {
-              ...data,
-              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-            };
-            return [newEntry, ...prev].slice(0, 10);
-          });
-        }
-      };
+    // 1. 신뢰도가 90% 이상이고
+    // 2. 인식된 단어가 'IDLE'이나 '...'이 아닐 때만 로그에 저장합니다.
+    if (data.confidence > 0.90 && data.word !== 'IDLE' && data.word !== '...') {
+      setLogs((prev) => {
+        // 바로 직전에 저장된 단어와 같으면 중복 저장 방지
+        if (prev.length > 0 && prev[0].word === data.word) return prev;
+        
+        const newEntry = {
+          ...data,
+          timestamp: new Date().toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit' 
+          })
+        };
+        // 최신 로그 10개까지만 유지
+        return [newEntry, ...prev].slice(0, 10);
+      });
+    }
+  };
 
       socket.onerror = (err) => {
         console.error("❌ 연결 에러 발생:", err);

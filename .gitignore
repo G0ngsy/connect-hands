@@ -6,6 +6,11 @@ __pycache__/
 venv/
 .env
 
+venv310/
+venv/
+__pycache__/
+*.pyc
+
 # OS
 .DS_Store
 Thumbs.db
