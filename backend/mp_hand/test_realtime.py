@@ -2,7 +2,7 @@ import cv2, mediapipe as mp, numpy as np
 from tensorflow.keras.models import load_model
 
 # 1. 모델 로드
-actions = ['안녕하세요','ILOVEU','반갑다','HELLO', '감사합니다','좋다','BAD','만나다','IDLE']
+actions = ['안녕하세요','ILOVEU','반갑다','HELLO', '좋다','BAD','만나다','IDLE']
 model = load_model('suyeo_model.h5')
 
 mp_hands = mp.solutions.hands

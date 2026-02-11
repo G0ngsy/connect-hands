@@ -4,7 +4,7 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
 from tensorflow.keras.utils import to_categorical
 from sklearn.model_selection import train_test_split
 
-actions = ['안녕하세요','ILOVEU','반갑다','HELLO', '감사합니다','좋다','BAD','만나다','IDLE']
+actions = ['안녕하세요','ILOVEU','반갑다','HELLO', '좋다','BAD','만나다','IDLE']
 data_path = r"C:\Users\akfnx\Desktop\suhwa\results"
 max_len = 62 
 
