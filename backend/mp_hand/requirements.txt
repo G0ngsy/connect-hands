@@ -2,7 +2,7 @@ fastapi
 uvicorn
 mediapipe
 opencv-python-headless
-tensorflow-cpu
+tensorflow
 numpy
 google-generativeai
 python-dotenv
