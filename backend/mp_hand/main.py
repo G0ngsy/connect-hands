@@ -157,4 +157,11 @@ async def websocket_endpoint(ws: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    import os # 환경 변수를 읽기 위해 추가
+
+    # [수정] 배포 환경(Render 등)에서 지정한 포트 번호를 가져옵니다. 
+    # 로컬에서 실행할 때는 기본값으로 8080을 사용합니다.
+    port = int(os.environ.get("PORT", 8080))
+    
+    # host를 "0.0.0.0"으로 설정해야 외부(웹)에서 접속이 가능합니다.
+    uvicorn.run(app, host="0.0.0.0", port=port)
