@@ -43,11 +43,7 @@ const Header = ({ onGoHome }: HeaderProps) => {
         </div>
       </div>
 
-      {/* 우측 READY 상태 표시 */}
-      <div className="flex items-center gap-2 bg-[#D6F5E6] px-4 py-1.5 rounded-xl border border-[#A3EBCC]">
-        <span className="w-2 h-2 bg-[#00CC66] rounded-full animate-pulse"></span>
-        <span className="text-[#006633] text-[11px] font-black uppercase tracking-widest">Ready</span>
-      </div>
+   
     </header>
   );
 };
