@@ -24,8 +24,7 @@ function App() {
     let socket: WebSocket | null = null;
     if (isStarted) {
       // 카메라가 켜졌을 때만 실시간 웹소켓 연결 시작
-      // socket = new WebSocket('ws://127.0.0.1:8080/ws');
-      socket = new WebSocket('wss://connect-hands-api.onrender.com/ws');
+      socket = new WebSocket('ws://127.0.0.1:8080/ws');
       socket.onmessage = (event) => {
         const data: SignResult = JSON.parse(event.data);
         setCurrentResult(data);
