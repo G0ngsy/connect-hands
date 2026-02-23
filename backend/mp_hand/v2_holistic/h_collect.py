@@ -6,7 +6,7 @@ from PIL import ImageFont, ImageDraw, Image
 
 # [설정] 저장 경로 및 단어 설정
 # v2_holistic/data 폴더 안에 단어별로 저장되도록 설정
-action_name = "안녕하세요"  # 촬영할 단어 이름으로 변경하세요
+action_name = "반갑다"  # 촬영할 단어 이름으로 변경하세요
 output_dir = os.path.join('data', action_name)
 os.makedirs(output_dir, exist_ok=True)
 
