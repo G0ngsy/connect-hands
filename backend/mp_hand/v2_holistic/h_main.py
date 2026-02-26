@@ -6,21 +6,21 @@ import base64
 import json
 import asyncio
 import time
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from tensorflow.keras.models import load_model
 import google.generativeai as genai
 from dotenv import load_dotenv
+import ollama
 
-# .env 파일 로드 (API 키 보안)
+# .env 파일 로드
 load_dotenv()
 
 # ==========================================
-# 1. 초기 설정 및 라이브러리 세팅
+# 1. 초기 설정 및 Gemini AI 세팅
 # ==========================================
 app = FastAPI()
 
-# 브라우저(React) 접속 허용 설정 (CORS)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,43 +31,51 @@ app.add_middleware(
 
 # --- Gemini AI API 설정 ---
 api_key = os.getenv("GOOGLE_API_KEY")
+gemini_model = None
 if api_key:
-    genai.configure(api_key=api_key)
-    gemini_model = genai.GenerativeModel('gemini-1.5-flash')
-    print("✅ Gemini API 연결 성공!")
+    try:
+        genai.configure(api_key=api_key)
+        gemini_model = genai.GenerativeModel('gemini-flash-latest') 
+        
+        print("✅ Gemini API 연결 성공! (사용 모델: gemini-flash-latest)")
+    except Exception as e:
+        print(f"❌ Gemini 설정 실패: {e}")
 else:
-    print("❌ .env 파일에서 GOOGLE_API_KEY를 찾을 수 없습니다.")
+    print("❌ 에러: .env 파일에서 GOOGLE_API_KEY를 읽지 못했습니다.")
 
 # ==========================================
 # 2. 모델 및 수어 데이터 로드
 # ==========================================
-# 실제 data 폴더의 폴더명들을 읽어와 가나다순으로 라벨링합니다.
 DATA_PATH = os.path.join('data')
+# 폴더명을 가나다순으로 읽어와 학습 시 라벨링 순서와 일치시킴
 actions = np.array(sorted([d for d in os.listdir(DATA_PATH) if os.path.isdir(os.path.join(DATA_PATH, d))]))
 print(f"✅ 인식 가능한 단어 리스트 ({len(actions)}개): {actions}")
 
 # 학습된 LSTM 모델 로드
 model = load_model(os.path.join('models', 'holistic_model.h5'))
 
-# MediaPipe Holistic 모델 초기화
+# MediaPipe Holistic 설정 (complexity=0으로 성능 최적화)
 mp_holistic = mp.solutions.holistic
-#그림을 그리는 도구인 drawing_utils를 mp_draw라는 이름으로 선언
 mp_draw = mp.solutions.drawing_utils 
+holistic = mp_holistic.Holistic(
+    min_detection_confidence=0.5, 
+    min_tracking_confidence=0.5,
+    model_complexity=0
+)
 
-holistic = mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5)
-
-# 실시간 상태 관리를 위한 전역 변수
-sequence = []           # 30프레임 데이터를 담는 바구니
-sentence_list = []      # 인식된 단어들을 모은 리스트
-last_translated = ""    # Gemini가 번역한 최종 문장
+# --- 실시간 상태 관리를 위한 전역 변수 ---
+sequence = []           
+sentence_list = []      
+last_translated = ""    
+is_translating = False  # 번역 중복 호출 방지용 깃발
+last_gemini_call_time = 0 # 429 에러 방지용 쿨타임 변수
 
 # ==========================================
 # 3. 핵심 유틸리티 함수 (좌표 추출 및 번역)
 # ==========================================
 
 def extract_keypoints(results):
-    """MediaPipe 결과에서 177개의 상대 좌표 추출"""
-    # Pose: 얼굴 위치(0~10) + 상체(11~16) = 17개 점 사용
+    """177개의 상대 좌표 추출 (Pose 17개 + Hands 21개씩)"""
     if results.pose_landmarks:
         pose = np.array([[results.pose_landmarks.landmark[i].x, 
                           results.pose_landmarks.landmark[i].y, 
@@ -75,14 +83,12 @@ def extract_keypoints(results):
     else:
         pose = np.zeros(17*3)
 
-    # Left Hand: 손목(0번) 기준 상대 좌표 (정규화)
     if results.left_hand_landmarks:
         lh_base = results.left_hand_landmarks.landmark[0]
         lh = np.array([[res.x - lh_base.x, res.y - lh_base.y, res.z - lh_base.z] for res in results.left_hand_landmarks.landmark]).flatten()
     else:
         lh = np.zeros(21*3)
         
-    # Right Hand: 손목(0번) 기준 상대 좌표 (정규화)
     if results.right_hand_landmarks:
         rh_base = results.right_hand_landmarks.landmark[0]
         rh = np.array([[res.x - rh_base.x, res.y - rh_base.y, res.z - rh_base.z] for res in results.right_hand_landmarks.landmark]).flatten()
@@ -91,51 +97,99 @@ def extract_keypoints(results):
     
     return np.concatenate([pose, lh, rh])
 
-async def get_gemini_translation(words):
-    """단어 리스트를 전문 수어 통역사처럼 자연스러운 문장으로 변환"""
-    if not words: return ""
+# async def get_gemini_translation(word_list):
+#     """단어 리스트를 자연스러운 한국어 문장으로 의역"""
+#     global gemini_model
+#     if not gemini_model or not word_list: return ""
     
-     # [핵심] Gemini에게 부여하는 역할과 규칙을 상세하게 설정합니다.
+#     prompt = (
+#         f"당신은 전문 수어 통역사입니다. 다음 나열된 수어 단어들 [{', '.join(word_list)}]를 "
+#         f"맥락에 맞는 자연스럽고 정중한 한국어 문장으로 만들어주세요. "
+#         f"다른 설명 없이 오직 완성된 문장 딱 한 줄만 말해줘."
+#     )
+    
+#     try:
+#         # 비동기 처리를 위해 스레드에서 실행
+#         response = await asyncio.to_thread(gemini_model.generate_content, prompt)
+#         translated_text = response.text.strip().replace('"', '').replace("'", "")
+#         print(f"🤖 Gemini 통역: {translated_text}")
+#         return translated_text
+#     except Exception as e:
+#         print(f"⚠️ Gemini 에러: {e}")
+#         return " + ".join(word_list)
+
+async def update_translation_task(word_list):
+    """배경에서 번역을 수행하고 결과 변수를 업데이트 (카메라 끊김 방지)"""
+    global last_translated, is_translating
+    is_translating = True
+    result = await get_llama_translation(word_list)
+    last_translated = result
+    is_translating = False
+    
+# [수정] 내 컴퓨터의 Llama 3를 사용하는 번역 함수
+async def get_llama_translation(word_list):
+    """로컬 RTX 4070의 Llama 3.2로 자연스러운 문장 생성"""
+    if not word_list: return ""
+    
+    input_text = ", ".join(word_list)
+    # 인공지능에게 줄 명령(프롬프트)
     prompt = (
-        f"당신은 농인과 청인을 연결하는 '전문 수어 통역사'입니다. "
-        f"수어는 조사와 어미가 생략된 단어 위주의 나열로 이루어져 있습니다. "
-        f"다음 나열된 수어 단어들의 맥락을 파악하여, 한국어 문법에 맞는 자연스럽고 정중한 문장으로 의역해 주세요.\n\n"
-        f"수어 단어 목록: {' '.join(words)}\n\n"
-        f"⚠️ 규칙:\n"
-        f"1. '나 + 너'와 같이 중복되거나 나열된 주어는 '우리' 혹은 '저와 당신'으로 자연스럽게 통합하세요.\n"
-        f"2. 전체적인 상황을 고려하여 적절한 조사와 서술어 어미(예: ~입니다, ~해요)를 붙이세요.\n"
-        f"3. 불필요한 단어 반복은 삭제하고 핵심 의미만 전달하세요.\n"
-        f"4. **다른 설명 없이 오직 완성된 문장 딱 한 줄만 출력하세요.**"
+        f"너는 전문 수어 통역사야. 아래 단어들을 조합해 '하나'의 자연스러운 한국어 문장을 만들어.\n"
+        f"입력 단어: [{input_text}]\n\n"
+        f"⚠️ 규칙(반드시 지킬 것):\n"
+        f"1. 다른 설명, 인사말, 서론을 절대 하지 마.\n"
+        f"2. 1., 2. 처럼 번호를 매기지 마.\n"
+        f"3. 일본어나 영어 등 다른 언어를 섞지 말고 오직 한국어만 사용해.\n"
+        f"4. 오직 완성된 문장 딱 한 줄만 출력해.\n"
+        f"5. 입력되지 않은 정보를 마음대로 추가하거나 지어내지 마. 제공된 단어들의 의미 안에서만 문장을 연결해."
     )
     
     try:
-        loop = asyncio.get_event_loop()
-        # 스트리밍 방식이 아닌 일반 생성 방식으로 호출
-        response = await loop.run_in_executor(None, lambda: gemini_model.generate_content(prompt))
+        # RTX 4070의 힘을 빌려 문장 생성 (비차단 방식)
+        response = await asyncio.to_thread(
+            ollama.chat, 
+            model='gemma3:4b', 
+           messages=[
+                # 시스템 역할을 부여하여 지능을 고정시킵니다.
+                # {'role': 'system', 'content': '너는 오직 한국어로만 대답하는 전문 수어 통역사야. 절대 부연설명을 하지 마.'},
+                {'role': 'system', 'content': '단어를 가지고 한줄로 요약한다. 되묻지 않는다.'},
+                # {'role': 'user', 'content': prompt}
+                {'role': 'user', 'content': "prompt"}
+            ],
+            # 생성 옵션을 조절하여 '창의성'을 낮추고 '정확도'를 높입니다.
+            options={
+                'temperature': 0.1, # 0에 가까울수록 정답만 말함
+                'top_p': 0.9
+            }
+        )
+        translated_text = response['message']['content'].strip()
         
-        translated_text = response.text.strip()
-        
-        # 따옴표나 불필요한 기호 제거
+        # 만약 결과에 따옴표가 포함되어 오면 제거
         translated_text = translated_text.replace('"', '').replace("'", "")
         
-        print(f"🤖 Gemini 번역 완료: {translated_text}") 
+        print(f"🦙 Llama 3 통역: {translated_text}")
         return translated_text
+        
     except Exception as e:
-        print(f"❌ Gemini 에러: {e}")
-        return " + ".join(words) # 에러 발생 시 단어 나열로 복구
+        print(f"❌ Llama 3 에러: {e}")
+        return " + ".join(word_list)
 
 # ==========================================
-# 4. 웹소켓 통신 (리액트 실시간 연동)
+# 4. 웹소켓 통신 (메인 루프)
 # ==========================================
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    global sequence, sentence_list, last_translated
+    global sequence, sentence_list, last_translated, is_translating, last_gemini_call_time
     await websocket.accept()
     
     last_add_time = 0      
     idle_start_time = 0    
+    frame_count = 0  
     
+    curr_word = "..."
+    curr_conf = 0.0
+
     cap = cv2.VideoCapture(0) 
     
     try:
@@ -147,90 +201,103 @@ async def websocket_endpoint(websocket: WebSocket):
             image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = holistic.process(image_rgb)
             
-            # ------------------------------------------------------
-            # [추가] 뼈대 그리기 (이미지 인코딩 전에 실행)
-            # ------------------------------------------------------
-            # 1. 포즈(몸) 뼈대 그리기
+            # [시각화] 뼈대 그리기
             if results.pose_landmarks:
-                mp_draw.draw_landmarks(
-                frame, results.pose_landmarks, mp_holistic.POSE_CONNECTIONS,
-                mp_draw.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=4), # 관절 색상
-                mp_draw.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2)  # 연결선 색상
-                )
-
-            # 2. 양손 뼈대 그리기
+                mp_draw.draw_landmarks(frame, results.pose_landmarks, mp_holistic.POSE_CONNECTIONS)
             if results.left_hand_landmarks:
                 mp_draw.draw_landmarks(frame, results.left_hand_landmarks, mp_holistic.HAND_CONNECTIONS)
             if results.right_hand_landmarks:
                 mp_draw.draw_landmarks(frame, results.right_hand_landmarks, mp_holistic.HAND_CONNECTIONS)
 
-            # 3. 얼굴 망(Face Mesh) 그리기 (너무 복잡해 보이면 이 부분만 주석 처리하세요)
-            # if results.face_landmarks:
-            #     mp_draw.draw_landmarks(
-            #         frame, results.face_landmarks, mp_holistic.FACEMESH_CONTOURS,
-            #         mp_draw.DrawingSpec(color=(80, 110, 10), thickness=1, circle_radius=1),
-            #         mp_draw.DrawingSpec(color=(80, 256, 121), thickness=1, circle_radius=1)
-            #     )
-            # ------------------------------------------------------
-
-            # 좌표 추출 및 30프레임 데이터 업데이트
+            # 좌표 추출 및 시퀀스 업데이트
             keypoints = extract_keypoints(results)
             sequence.append(keypoints)
             sequence = sequence[-30:] 
             
-            current_word = "IDLE"
-            confidence = 0.0
             now = time.time()
-            
-            if len(sequence) == 30:
-                if not results.left_hand_landmarks and not results.right_hand_landmarks:
-                    current_word = "IDLE"
+            frame_count += 1
+
+            # [최적화] 5프레임마다 단어 예측 수행 (부하 감소)
+            if frame_count % 5 == 0 and len(sequence) == 30:
+                is_hands_up = False
+                if results.pose_landmarks:
+                    # 15, 16: 손목 / 23, 24: 골반(Hip)
+                    left_wrist_y = results.pose_landmarks.landmark[15].y
+                    right_wrist_y = results.pose_landmarks.landmark[16].y
+                    hip_y = (results.pose_landmarks.landmark[23].y + results.pose_landmarks.landmark[24].y) / 2
+                    # 배꼽 근처(골반 살짝 위)보다 손목이 높아야 '손 올림'으로 간주
+                    if left_wrist_y < (hip_y - 0.05) or right_wrist_y < (hip_y - 0.05):
+                        is_hands_up = True
+
+                if not is_hands_up or (not results.left_hand_landmarks and not results.right_hand_landmarks):
+                    curr_word = "IDLE"
+                    curr_conf = 0.0
                     if idle_start_time == 0: idle_start_time = now
-                    elif now - idle_start_time > 3.0: 
+                    elif now - idle_start_time > 3.0: # 3초간 손 내리면 초기화
                         sentence_list = []
                         last_translated = ""
                 else:
                     idle_start_time = 0 
+                    # LSTM 모델 예측
                     res = model(np.expand_dims(sequence, axis=0), training=False)[0].numpy()
                     prediction_idx = np.argmax(res)
                     
                     if prediction_idx < len(actions):
-                        current_word = actions[prediction_idx]
-                        confidence = float(res[prediction_idx])
+                        curr_word = actions[prediction_idx]
+                        curr_conf = float(res[prediction_idx])
                         
-                        if confidence > 0.98 and current_word != "IDLE" and (now - last_add_time > 2.0):
-                            if not sentence_list or current_word != sentence_list[-1]:
-                                sentence_list.append(current_word)
+                        # --- [단어 추가 로직] ---
+                        if curr_conf > 0.98 and curr_word != "IDLE" and (now - last_add_time > 3.0):
+                            if curr_word not in sentence_list:
+                                sentence_list.append(curr_word)
                                 last_add_time = now
-                                last_translated = await get_gemini_translation(sentence_list)
+                                
+                                # 단어가 딱 1개일 때는 AI 안 부르고 바로 표시 (속도 향상)
+                                if len(sentence_list) == 1:
+                                    last_translated = curr_word
+                                # 2개 이상일 때만 Llama 3 호출
+                                elif len(sentence_list) >= 2:
+                                    if (now - last_gemini_call_time > 3.0) and not is_translating:
+                                        asyncio.create_task(update_translation_task(sentence_list))
+                                        last_gemini_call_time = now 
+                                    else:
+                                        # 번역 대기 중에는 단어들을 나열해서 미리 보여줌
+                                        last_translated = " + ".join(sentence_list)
 
-            display_word = current_word if (current_word != "IDLE" and confidence > 0.85) else "..."
+                # --- [초기화 로직 보강] ---
+                # 손을 내리고 3초가 지나면 문장 리스트와 번역 결과 모두 삭제
+                if not is_hands_up and idle_start_time != 0 and (now - idle_start_time > 3.0):
+                    sentence_list = []
+                    last_translated = "" # [추가] 화면을 깨끗하게 비움
+
+            # --- [리액트 전송 준비] ---
+            # 화면 중앙의 큰 글자: 90% 이상 확신할 때만 표시
+            display_word = curr_word if (curr_word != "IDLE" and curr_conf > 0.90) else "..."
             
-            # 이미 뼈대가 그려진 frame을 인코딩해서 보냅니다.
-            _, buffer = cv2.imencode('.jpg', frame)
+            _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
             jpg_as_text = base64.b64encode(buffer).decode('utf-8')
             
-            result_json = {
+            await websocket.send_text(json.dumps({
                 "word": display_word,
-                "confidence": confidence,
-                "sentence": " + ".join(sentence_list) if sentence_list else "수어를 기다리는 중...",
-                "translated": last_translated if last_translated else "문장을 만드는 중...",
+                "confidence": curr_conf,
+                "sentence": " + ".join(sentence_list) if sentence_list else "수어를 대기 중입니다...",
+                "translated": last_translated,
                 "image": jpg_as_text
-            }
-            
-            await websocket.send_text(json.dumps(result_json))
+            }))
             await asyncio.sleep(0.01)
 
+    except WebSocketDisconnect:
+        print("ℹ️ 리액트 연결 종료")
     except Exception as e:
-        print(f"❌ 웹소켓 연결 종료: {e}")
+        print(f"❌ 에러: {e}")
     finally:
         cap.release()
-        await websocket.close()
+        try: await websocket.close()
+        except: pass
 
 # ==========================================
-# 5. 서버 실행 (Uvicorn)
+# 5. 서버 실행
 # ==========================================
 if __name__ == "__main__":
     import uvicorn
-    # 리액트 앱과 통신할 8080 포트로 서버 실행
     uvicorn.run(app, host="0.0.0.0", port=8080)

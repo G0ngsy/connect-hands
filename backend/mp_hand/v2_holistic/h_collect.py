@@ -6,7 +6,7 @@ import time
 from PIL import ImageFont, ImageDraw, Image
 
 # [설정]
-action_name = "너"  # 단어 이름을 바꿔가며 촬영하세요
+action_name = "반갑다"  # 단어 이름을 바꿔가며 촬영하세요
 max_len = 30               # 한 동작당 30프레임 (1초)
 data_path = os.path.join('data')
 output_dir = os.path.join(data_path, action_name)
