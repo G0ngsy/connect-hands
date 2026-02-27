@@ -4,7 +4,7 @@ interface SignResult {
   word: string;
   confidence: number;
   sentence: string;
-  translated: string;
+  translated: string[];
   image: string;
   is_detected?: boolean;
   timestamp?: string;
@@ -41,12 +41,14 @@ const HistoryLog = ({ logs }: HistoryLogProps) => {
               {logs.map((log, index) => (
                 <div key={index} className="flex justify-between items-center p-4 bg-pink-50/30 rounded-3xl border border-pink-100/50">
                   <div className="text-left">
-                    <p className="text-lg font-black text-[#330019]">{log.word}</p>
-                    <p className="text-[10px] text-gray-400 mt-1">{log.timestamp}</p>
+                    {/* 단어 대신 사용자가 선택한 문장을 보여줍니다. */}
+                    <p className="text-lg font-black text-[#330019]">{log.translated[0]}</p>
+                    {/* 보조 정보로 인식된 마지막 단어와 시간을 작게 표시합니다. */}
+                    <p className="text-[10px] text-gray-400 mt-1"> {log.timestamp} • Last Word: {log.word}</p>
                   </div>
-                  <span className="text-xs font-bold text-pink-500 bg-white px-3 py-1 rounded-full shadow-sm">
+                  {/* <span className="text-xs font-bold text-pink-500 bg-white px-3 py-1 rounded-full shadow-sm">
                     {(log.confidence * 100).toFixed(0)}%
-                  </span>
+                  </span> */}
                 </div>
               ))}
             </div>
