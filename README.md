@@ -17,7 +17,7 @@
 * **AI 추론 엔진**: `TensorFlow` (LSTM 수어 인식) + `Ollama` (EXAONE 3.5 문장 생성)
 * **데이터 처리**: `MediaPipe Holistic` (177개 핵심 관절 데이터 추출)
 
-<img width="1122" height="493" alt="수어-페이지-1 drawio (1)" src="https://github.com/user-attachments/assets/7fdbc34a-e2aa-40c3-af57-b38f9df290c9" />
+<img width="1122" height="493" alt="수어-페이지-1 drawio" src="https://github.com/user-attachments/assets/84a8707d-ad0c-42de-868f-67ebff0c695b" />
 
 
 ## 3. 핵심 기술 및 데이터 파이프라인
