@@ -104,3 +104,17 @@
 
 ### **WebSocket**
 > 1초에 30번 이상의 데이터를 실시간으로 주고받기 위해 HTTP보다 빠른 양방향 통로가 필수적입니다.
+
+---
+
+## 9.실행 방법(Usage)
+```
+1. Ollama 실행
+    ollama run exaone3.5:7.8b
+
+2. Backend
+    cd backend/mp_hand/v2_holistic -> python h_main.py
+
+3. Frontend
+    cd frontend -> npm run dev
+```
