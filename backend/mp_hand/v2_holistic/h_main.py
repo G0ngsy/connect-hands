@@ -241,7 +241,7 @@ async def websocket_endpoint(websocket: WebSocket):
     last_gemini_call_time = 0 # 쿨타임 타이머 리셋
 
     # 4. 루프 내에서 사용할 로컬 변수(도구들 준비) 초기화
-    ast_add_time = 0      # 마지막으로 단어를 추가한 시간 (너무 빨리 중복 추가되는 것 방지)
+    last_add_time = 0      # 마지막으로 단어를 추가한 시간 (너무 빨리 중복 추가되는 것 방지)
     idle_start_time = 0    # 손을 내리고 쉰 시간 체크용
     frame_count = 0        # 카메라 프레임(사진) 번호
     curr_word = "..."      # 현재 화면에 띄울 단어
