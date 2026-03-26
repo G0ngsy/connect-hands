@@ -21,7 +21,7 @@
 
 ### 📸화면 미리보기
 <div align="center">
-    <img src="C:/Users/akfnx/connect-hands/frontend/src/assets/ConnectHands.gif" width="200" />
+    <img src="frontend\src\assets\ConnectHands.gif" width="200" />
 </div>
 ---
 
