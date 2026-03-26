@@ -19,8 +19,10 @@
 4. **확정** ✅: 원하는 스타일의 문장을 클릭하여 `History Log`에 정식 기록
 5. **초기화** ♻️: 손을 내리고 일정 시간 대기 시 데이터 시퀀스 자동 리셋
 
-## 실행 화면
-
+### 📸화면 미리보기
+<div align="center">
+    <img src="C:/Users/akfnx/connect-hands/frontend/src/assets/ConnectHands.gif" width="200" />
+</div>
 ---
 
 ## 3. 핵심 기능 (Core Features) 🚀
