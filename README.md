@@ -5,8 +5,6 @@
 
 ## 1. 프로젝트 개요 (Overview) 📢
 **Connect Hands**는 청각장애인과 비장애인 사이의 소통 장벽을 낮추기 위한 **실시간 수어 통역·보조 서비스**입니다.
-* **핵심 기능**: 카메라 기반 수어 인식과 음성 인식(STT)을 결합
-* **기대 효과**: 수어 ↔ 음성/텍스트를 즉각적으로 변환하여 일상 및 공공기관 환경에서의 원활한 대화 지원
 
 ---
 
@@ -114,13 +112,21 @@
 ---
 
 ## 9.실행 방법(Usage)
+
+1) Ollama 실행 (Local LLM)
+```bash
+ollama run exaone3.5:7.8b
 ```
-1. Ollama 실행
-    ollama run exaone3.5:7.8b
 
-2. Backend
-    cd backend/mp_hand/v2_holistic -> python h_main.py
+2) Backend 실행
+```
+cd backend/mp_hand/v2_holistic
 
-3. Frontend
-    cd frontend -> npm run dev
+python h_main.py
+```
+3) Frontend 실행
+```
+cd frontend
+
+npm install && npm run dev
 ```
