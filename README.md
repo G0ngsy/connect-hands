@@ -19,9 +19,10 @@
 4. **확정** ✅: 원하는 스타일의 문장을 클릭하여 `History Log`에 정식 기록
 5. **초기화** ♻️: 손을 내리고 일정 시간 대기 시 데이터 시퀀스 자동 리셋
 
-### 📸화면 미리보기
+### 📸 주요 기능 시연 (Demo)
 <div align="center">
-    <img src="./frontend/src/assets/ConnectHands.gif" width="60%" />
+  <img src="./frontend/src/assets/ConnectHands.gif" width="60%" alt="수어 인식 서비스 시연 장면" />
+  <p><i>"MediaPipe 기반 실시간 수어 인식 및 텍스트 변환 서비스"</i></p>
 </div>
 
 ---
