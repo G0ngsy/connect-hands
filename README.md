@@ -21,8 +21,9 @@
 
 ### 📸화면 미리보기
 <div align="center">
-    <img src="frontend\src\assets\ConnectHands.gif" width="200" />
+    <img src="./frontend/src/assets/ConnectHands.gif" width="60%" />
 </div>
+
 ---
 
 ## 3. 핵심 기능 (Core Features) 🚀
