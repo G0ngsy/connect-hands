@@ -36,9 +36,8 @@
 
 ## 4. 시스템 아키텍처 (Architecture) 🏗️
 
-<p align="center">
-<img width="1122" height="493" alt="수어-페이지-1 drawio" src="https://github.com/user-attachments/assets/0db5b0b6-269f-4363-a60f-ef5d10ce93bb" />
-</p>
+![아키텍처](frontend/src/assets/아키텍처.png)
+
 
 ### 🔄 전체 데이터 파이프라인 (End-to-End Flow)
 1.  **Input**: 사용자의 수어 동작을 카메라로 캡처 (React Frontend).
